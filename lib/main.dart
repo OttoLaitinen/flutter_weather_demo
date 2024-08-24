@@ -20,7 +20,7 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const NavigationWidget(),
       theme: ThemeData.from(
-          colorScheme: ColorScheme.light(primary: Colors.blue.shade800)),
+          colorScheme: const ColorScheme.light(primary: Colors.black54)),
     );
   }
 }

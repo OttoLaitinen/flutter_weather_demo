@@ -61,14 +61,23 @@ class _WeatherInfoState extends State<WeatherInfo> {
                 }
               }
 
-              return const CircularProgressIndicator();
+              return const SizedBox(
+                  height: 300,
+                  child: Center(child: CircularProgressIndicator()));
             },
           ),
           const Gap(24),
           Center(
             child: ElevatedButton(
               onPressed: onPressed,
-              child: const Text("Change location"),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[300],
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 16.0, horizontal: 24.0)),
+              child: const Text(
+                "Change location",
+                style: TextStyle(color: Colors.black),
+              ),
             ),
           ),
         ],
@@ -102,6 +111,12 @@ class WeatherInfoDisplay extends StatelessWidget {
 
     return Column(
       children: [
+        const Gap(16),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
+          child: Image.asset(iconUrl,
+              errorBuilder: (ctx, error, stackTrace) => Image.asset('01d.png')),
+        ),
         Row(
           children: [
             const Icon(Icons.pin_drop),
@@ -111,12 +126,7 @@ class WeatherInfoDisplay extends StatelessWidget {
                     fontSize: 24.0, fontWeight: FontWeight.bold)),
           ],
         ),
-        const Gap(16),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
-          child: Image.asset(iconUrl,
-              errorBuilder: (ctx, error, stackTrace) => Image.asset('01d.png')),
-        ),
+        const Gap(8),
         Row(
           textBaseline: TextBaseline.values[0],
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
