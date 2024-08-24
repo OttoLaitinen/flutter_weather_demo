@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'package:provider/provider.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:weather_demo/data/google_autocomplete_api.dart';
+import 'package:weather_demo/providers/weather_provider.dart';
 
 const Duration fakeAPIDuration = Duration(milliseconds: 200);
-const Duration debounceDuration = Duration(milliseconds: 300);
+const Duration debounceDuration = Duration(milliseconds: 400);
 
 class AsyncCityAutocomplete extends StatefulWidget {
   const AsyncCityAutocomplete({super.key});
@@ -18,29 +21,15 @@ class AsyncCityAutocomplete extends StatefulWidget {
 
 class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
   String? _currentQuery;
+  Timer? _debounceTimer;
+  final TextEditingController _controller = TextEditingController();
 
-  late Iterable<String> _lastOptions = <String>[];
+  late Future<Iterable<Prediction>?> _futurePredictions;
 
-  late final _Debounceable<Iterable<Prediction>?, String> _debouncedSearch;
-
-  // // Calls the "remote" API to search with the given query. Returns null when
-  // // the call has been made obsolete.
-  // Future<Iterable<String>?> _search(String query) async {
-  //   _currentQuery = query;
-
-  //   // In a real application, there should be some error handling here.
-  //   final Iterable<String> options = await _FakeAPI.search(_currentQuery!);
-
-  //   // If another search happened after this one, throw away these options.
-  //   if (_currentQuery != query) {
-  //     return null;
-  //   }
-  //   _currentQuery = null;
-
-  //   return options;
-  // }
-
-  Future<Iterable<Prediction>?> _searchGooglePlaces(String query) async {
+  Future<Iterable<Prediction>?> _searchGooglePlaces(String? query) async {
+    if (!mounted || query == null || query.isEmpty) {
+      return null;
+    }
     _currentQuery = query;
 
     // In a real application, there should be some error handling here.
@@ -51,16 +40,35 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
     if (_currentQuery != query) {
       return null;
     }
+
     _currentQuery = null;
 
     return options;
   }
 
+  void _onSearchChanged(String query) {
+    if (_debounceTimer != null) {
+      _debounceTimer!.cancel();
+    }
+    _debounceTimer = Timer(debounceDuration, () {
+      setState(() {
+        _futurePredictions = _searchGooglePlaces(query);
+      });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _debouncedSearch =
-        _debounce<Iterable<Prediction>?, String>(_searchGooglePlaces);
+    _futurePredictions = _searchGooglePlaces(null);
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the focus node and remove any active overlays
+    log("Disposing");
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -69,22 +77,53 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("City search"),
-        Autocomplete<String>(
-          optionsBuilder: (TextEditingValue textEditingValue) async {
-            final Iterable<Prediction>? predictions =
-                await _debouncedSearch(textEditingValue.text);
-            final Iterable<String>? options =
-                predictions?.map((e) => e.description).toList();
+        TextField(
+            decoration: const InputDecoration(
+                hintText: 'Enter a city', border: OutlineInputBorder()),
+            onTapOutside: (event) => setState(() {
+                  _controller.clear();
+                }),
+            onChanged: _onSearchChanged,
+            controller: _controller),
+        FutureBuilder<Iterable<Prediction>?>(
+          future: _futurePredictions,
+          builder: (BuildContext context,
+              AsyncSnapshot<Iterable<Prediction>?> snapshot) {
+            log("Snapshot: ${snapshot.connectionState}");
+            if (snapshot.connectionState == ConnectionState.done) {
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
 
-            if (options == null) {
-              return _lastOptions;
+              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                return Column(
+                  children: snapshot.data!.map((Prediction prediction) {
+                    return ListTile(
+                      title: Text(prediction.description),
+                      onTap: () {
+                        log("Selected: ${prediction.description}");
+                        _futurePredictions = _searchGooglePlaces(null);
+                        context
+                            .read<WeatherModel>()
+                            .setWeatherLocationDescription(
+                                prediction.description);
+                        context
+                            .read<WeatherModel>()
+                            .setWeatherLocationPlaceId(prediction.placeId);
+                      },
+                    );
+                  }).toList(),
+                );
+              }
+              if (_controller.text.isEmpty) {
+                log("IS EMPTY");
+                return const SizedBox.shrink();
+              }
+              log("No results found");
+              return const Text("No results found");
             }
-            _lastOptions = options;
-            return options;
-          },
-          onSelected: (String selection) {
-            log('You just selected $selection');
+
+            return const CircularProgressIndicator();
           },
         ),
       ],
@@ -92,10 +131,10 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
   }
 }
 
-const String _googlePlacesAutocompleteUrl =
-    'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-
 class _GooglePlacesAutoCompleteAPI {
+  static const String _googlePlacesAutocompleteUrl =
+      'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+
   static Future<Iterable<Prediction>> searchForSuggestions(String query) async {
     final response = await http.get(Uri.parse(
         '$_googlePlacesAutocompleteUrl?input=$query&language=en&types=locality&key=${dotenv.env['MAPS_API_KEY']}'));
@@ -106,98 +145,17 @@ class _GooglePlacesAutoCompleteAPI {
     if (response.statusCode == 200 && autocompleteResponse.status == 'OK') {
       return autocompleteResponse.predictions;
     } else {
-      debugPrint("Failed!!");
-      return [];
+      throw Exception('Failed to load location suggestions');
     }
-  }
-}
-
-class AutocompleteResponse {
-  final List<Prediction> predictions;
-  final String status;
-
-  AutocompleteResponse({
-    required this.predictions,
-    required this.status,
-  });
-
-  factory AutocompleteResponse.fromJson(Map<String, dynamic> json) {
-    return AutocompleteResponse(
-      predictions: List<Prediction>.from(
-        json['predictions'].map((x) => Prediction.fromJson(x)),
-      ),
-      status: json['status'],
-    );
-  }
-}
-
-class Prediction {
-  final String description;
-  final String placeId;
-
-  Prediction({
-    required this.description,
-    required this.placeId,
-  });
-
-  factory Prediction.fromJson(Map<String, dynamic> json) {
-    return Prediction(
-      description: json['description'],
-      placeId: json['place_id'],
-    );
-  }
-}
-
-typedef _Debounceable<S, T> = Future<S?> Function(T parameter);
-
-/// Returns a new function that is a debounced version of the given function.
-///
-/// This means that the original function will be called only after no calls
-/// have been made for the given Duration.
-_Debounceable<S, T> _debounce<S, T>(_Debounceable<S?, T> function) {
-  _DebounceTimer? debounceTimer;
-
-  return (T parameter) async {
-    if (debounceTimer != null && !debounceTimer!.isCompleted) {
-      debounceTimer!.cancel();
-    }
-    debounceTimer = _DebounceTimer();
-    try {
-      await debounceTimer!.future;
-    } catch (error) {
-      if (error is _CancelException) {
-        return null;
-      }
-      rethrow;
-    }
-    return function(parameter);
-  };
-}
-
-// A wrapper around Timer used for debouncing.
-class _DebounceTimer {
-  _DebounceTimer() {
-    _timer = Timer(debounceDuration, _onComplete);
-  }
-
-  late final Timer _timer;
-  final Completer<void> _completer = Completer<void>();
-
-  void _onComplete() {
-    _completer.complete();
-  }
-
-  Future<void> get future => _completer.future;
-
-  bool get isCompleted => _completer.isCompleted;
-
-  void cancel() {
-    _timer.cancel();
-    _completer.completeError(const _CancelException());
   }
 }
 
 // An exception indicating that the timer was canceled.
 class _CancelException implements Exception {
   const _CancelException();
+}
+
+// An exception indicating that a network request has failed.
+class _NetworkException implements Exception {
+  const _NetworkException();
 }

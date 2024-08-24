@@ -18,7 +18,7 @@ class _NavigationWidgetState extends State<NavigationWidget> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         toolbarHeight: 0,
       ),
       bottomNavigationBar: NavigationBar(
@@ -27,7 +27,7 @@ class _NavigationWidgetState extends State<NavigationWidget> {
             currentPageIndex = index;
           });
         },
-        indicatorColor: Colors.lightBlueAccent,
+        indicatorColor: Colors.blue[200],
         selectedIndex: currentPageIndex,
         destinations: const <Widget>[
           NavigationDestination(

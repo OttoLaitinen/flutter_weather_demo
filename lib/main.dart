@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:weather_demo/navigationWidget.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:weather_demo/providers/weather_provider.dart';
 
 void main() async {
   await dotenv.load();
-  runApp(const MainApp());
+  runApp(MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => WeatherModel())],
+      child: const MainApp()));
 }
 
 class MainApp extends StatelessWidget {
@@ -12,7 +16,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-        debugShowCheckedModeBanner: false, home: NavigationWidget());
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const NavigationWidget(),
+      theme: ThemeData.from(
+          colorScheme: ColorScheme.light(primary: Colors.blue.shade800)),
+    );
   }
 }
