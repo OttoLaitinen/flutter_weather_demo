@@ -3,9 +3,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:provider/provider.dart';
 import 'package:weather_demo/data/open_weather_api_current_weather.dart';
-import 'package:weather_demo/providers/weather_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -34,51 +32,59 @@ class _WeatherInfoState extends State<WeatherInfo> {
 
   @override
   Widget build(BuildContext context) {
-    void onPressed() {
-      log("Clearing weather location");
-      context.read<WeatherModel>().clearWeatherLocation();
-    }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           FutureBuilder<WeatherResponse>(
             future: _currentWeather,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      children: [
+                        const Gap(24),
+                        Icon(Icons.error, color: Colors.red[700], size: 48.0),
+                        const Gap(8),
+                        const Text(
+                          'Failed to load weather data.',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 if (snapshot.hasData) {
                   final WeatherResponse weather = snapshot.data!;
                   return WeatherInfoDisplay(
                       currentWeather: weather,
                       weatherLocationDescription:
                           widget.weatherLocationDescription);
-                } else if (snapshot.hasError) {
-                  log("Error: ${snapshot.error}");
-                  return const Text("Failed to load weather");
                 }
               }
 
-              return const SizedBox(
+              return SizedBox(
                   height: 300,
-                  child: Center(child: CircularProgressIndicator()));
+                  child: Center(
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            backgroundColor: Colors.amber[400],
+                            strokeWidth: 6,
+                          ),
+                          const Gap(16),
+                          const Text('Loading weather data',
+                              style: TextStyle(
+                                  fontSize: 16.0, fontWeight: FontWeight.bold)),
+                        ]),
+                  ));
             },
-          ),
-          const Gap(24),
-          Center(
-            child: ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber[300],
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 16.0, horizontal: 24.0)),
-              child: const Text(
-                "Change location",
-                style: TextStyle(color: Colors.black),
-              ),
-            ),
           ),
         ],
       ),
@@ -174,13 +180,17 @@ class _OpenWeatherCurrentWeatherAPI {
     final response = await http.get(Uri.parse(
         '$_openWeatherMapApiUrl&q=$locationName&appid=${dotenv.env['OPEN_WEATHER_API_KEY']}'));
 
-    final WeatherResponse weatherResponse =
-        WeatherResponse.fromJson(jsonDecode(response.body));
-
     if (response.statusCode == 200) {
+      final WeatherResponse weatherResponse =
+          WeatherResponse.fromJson(jsonDecode(response.body));
       return weatherResponse;
     } else {
-      throw Exception('Failed to load weather');
+      log("Something went wrong: ${response.body}");
+      final ErrorWeatherResponse errorWeatherResponse =
+          ErrorWeatherResponse.fromJson(jsonDecode(response.body));
+      // TODO: send error to an external service
+      throw Exception(
+          "Failed to load weather data: ${errorWeatherResponse.message}");
     }
   }
 }

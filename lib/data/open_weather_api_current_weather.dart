@@ -67,6 +67,24 @@ class WeatherResponse {
   }
 }
 
+class ErrorWeatherResponse {
+  final String
+      cod; // String because it can be '404' (stupid I know when the 200 is a number always)
+  final String message;
+
+  ErrorWeatherResponse({
+    required this.cod,
+    required this.message,
+  });
+
+  factory ErrorWeatherResponse.fromJson(Map<String, dynamic> json) {
+    return ErrorWeatherResponse(
+      cod: json['cod'],
+      message: json['message'],
+    );
+  }
+}
+
 class Coord {
   final double lon;
   final double lat;

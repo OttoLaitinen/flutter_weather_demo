@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:weather_demo/data/google_autocomplete_api.dart';
 import 'package:weather_demo/providers/weather_provider.dart';
+import 'package:go_router/go_router.dart';
 
 const Duration fakeAPIDuration = Duration(milliseconds: 200);
 const Duration debounceDuration = Duration(milliseconds: 400);
@@ -27,7 +29,10 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
   late Future<Iterable<Prediction>?> _futurePredictions;
 
   Future<Iterable<Prediction>?> _searchGooglePlaces(String? query) async {
-    if (!mounted || query == null || query.isEmpty) {
+    if (!mounted ||
+        query == null ||
+        query.isEmpty ||
+        _controller.text.isEmpty) {
       return null;
     }
     _currentQuery = query;
@@ -60,19 +65,20 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
   @override
   void initState() {
     super.initState();
+    _controller.clear();
     _futurePredictions = _searchGooglePlaces(null);
   }
 
   @override
   void dispose() {
     // Dispose of the focus node and remove any active overlays
-    log("Disposing");
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    log("text: ${_controller.text}");
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +87,8 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
             decoration: const InputDecoration(
                 hintText: 'Enter a city', border: OutlineInputBorder()),
             onTapOutside: (event) => setState(() {
-                  _controller.clear();
+                  log('Tapped outside');
+                  FocusManager.instance.primaryFocus?.unfocus();
                 }),
             onChanged: _onSearchChanged,
             controller: _controller),
@@ -89,41 +96,122 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
           future: _futurePredictions,
           builder: (BuildContext context,
               AsyncSnapshot<Iterable<Prediction>?> snapshot) {
-            log("Snapshot: ${snapshot.connectionState}");
             if (snapshot.connectionState == ConnectionState.done) {
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              }
-
-              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                return Column(
-                  children: snapshot.data!.map((Prediction prediction) {
-                    return ListTile(
-                      title: Text(prediction.description),
-                      onTap: () {
-                        log("Selected: ${prediction.description}");
-                        _futurePredictions = _searchGooglePlaces(null);
-                        context
-                            .read<WeatherModel>()
-                            .setWeatherLocationDescription(
-                                prediction.description);
-                        context
-                            .read<WeatherModel>()
-                            .setWeatherLocationPlaceId(prediction.placeId);
-                      },
-                    );
-                  }).toList(),
-                );
+              if (snapshot.data != null) {
+                for (final Prediction prediction in snapshot.data!) {
+                  log('Prediction: ${prediction.description}');
+                }
               }
               if (_controller.text.isEmpty) {
-                log("IS EMPTY");
                 return const SizedBox.shrink();
               }
-              log("No results found");
-              return const Text("No results found");
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Gap(16),
+                  if (snapshot.hasError)
+                    Container(
+                      decoration: BoxDecoration(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(4)),
+                          color: Colors.red[700]),
+                      child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                left: 12.0,
+                                right: 12.0,
+                                top: 16.0,
+                                bottom: 16.0),
+                            child: Text(
+                              'Error: ${snapshot.error}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (snapshot.hasData && snapshot.data!.isNotEmpty) ...[
+                    const Text(
+                      'Search Results: ',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    const Gap(8),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      itemBuilder: (_, index) {
+                        final Prediction prediction =
+                            snapshot.data!.elementAt(index);
+                        return ListTile(
+                          dense: true,
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey[600],
+                          ),
+                          contentPadding: const EdgeInsets.all(0),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          title: Text(
+                            prediction.description,
+                          ),
+                          onTap: () {
+                            _futurePredictions = _searchGooglePlaces(null);
+                            _controller.clear();
+
+                            context
+                                .read<WeatherModel>()
+                                .setWeatherLocationDescription(
+                                    prediction.description);
+
+                            context
+                                .read<WeatherModel>()
+                                .setWeatherLocationPlaceId(prediction.placeId);
+
+                            context
+                                .push(Uri(
+                                    path: '/weather_search/result',
+                                    queryParameters: {
+                                      'weatherLocationDescription':
+                                          prediction.description,
+                                      'placeId': prediction.placeId
+                                    }).toString())
+                                .then((value) => setState(() =>
+                                    {})); // Rerender the UI to clear the search results
+                          },
+                        );
+                      },
+                      separatorBuilder: (_, index) => const SizedBox(height: 4),
+                      itemCount: snapshot.data!.length,
+                    ),
+                  ] else if (_controller.text.isNotEmpty)
+                    const Text("No results found")
+                ],
+              );
             }
 
-            return const CircularProgressIndicator();
+            return Column(
+              children: [
+                const Gap(16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        backgroundColor: Colors.amber[400],
+                        strokeWidth: 2,
+                      ),
+                    ),
+                    const Gap(8),
+                    const Text("Searching for locations..."),
+                  ],
+                ),
+              ],
+            );
           },
         ),
       ],
@@ -142,20 +230,11 @@ class _GooglePlacesAutoCompleteAPI {
     final AutocompleteResponse autocompleteResponse =
         AutocompleteResponse.fromJson(jsonDecode(response.body));
 
-    if (response.statusCode == 200 && autocompleteResponse.status == 'OK') {
+    if (response.statusCode == 200) {
       return autocompleteResponse.predictions;
     } else {
+      // TODO: Add logging to an external service
       throw Exception('Failed to load location suggestions');
     }
   }
-}
-
-// An exception indicating that the timer was canceled.
-class _CancelException implements Exception {
-  const _CancelException();
-}
-
-// An exception indicating that a network request has failed.
-class _NetworkException implements Exception {
-  const _NetworkException();
 }
