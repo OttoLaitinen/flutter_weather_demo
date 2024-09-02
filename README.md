@@ -14,7 +14,7 @@ flutter pub get
 
 ## Features
 
-- Autocomplete location search for weather locations using Google Places autocomplete API
+- Autocomplete location search with debounce for weather locations using Google Places autocomplete API
 
   https://github.com/user-attachments/assets/520259ed-85b8-4283-97ab-64f90fb25160
 
