@@ -15,9 +15,19 @@ flutter pub get
 ## Features
 
 - Autocomplete location search for weather locations using Google Places autocomplete API
+  
+
+https://github.com/user-attachments/assets/884c072f-bf22-410b-942b-f1dff2d23a8b
+
+
 - Weather information screen with current weather information from OpenWeatherMap API
 - Navigation structure built with GoRouter
 - Local state management for (per session) weather search history using Providers
+  
+
+https://github.com/user-attachments/assets/69cd20f2-ccd0-43f5-8cef-51436a155dd6
+
+
 
 ## Known issues
 
