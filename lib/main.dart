@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:weather_demo/bottomNavigation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:weather_demo/providers/weather_provider.dart';
+import 'package:weather_demo/providers/search_history_provider.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:weather_demo/screens/info_tab.dart';
@@ -16,8 +16,9 @@ final GlobalKey<NavigatorState> _shellNavigatorKey =
 
 void main() async {
   await dotenv.load();
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => WeatherModel())],
+      providers: [ChangeNotifierProvider(create: (_) => SearchHistoryModel())],
       child: MainApp()));
 }
 
@@ -37,18 +38,7 @@ class MainApp extends StatelessWidget {
                   path: "/weather_search",
                   pageBuilder: (BuildContext context, GoRouterState state) {
                     return const NoTransitionPage(child: WeatherSearchTab());
-                  },
-                  routes: <RouteBase>[
-                    GoRoute(
-                      path: "result",
-                      builder: (BuildContext context, GoRouterState state) {
-                        return WeatherDetailsScreen(
-                            weatherLocationDescription: state.uri
-                                .queryParameters['weatherLocationDescription']!,
-                            placeId: state.uri.queryParameters['placeId']!);
-                      },
-                    )
-                  ]),
+                  }),
               GoRoute(
                 path: "/info",
                 pageBuilder: (BuildContext context, GoRouterState state) {
@@ -56,6 +46,15 @@ class MainApp extends StatelessWidget {
                 },
               )
             ]),
+        GoRoute(
+          path: "/weather_result",
+          builder: (BuildContext context, GoRouterState state) {
+            return WeatherDetailsScreen(
+                weatherLocationDescription:
+                    state.uri.queryParameters['weatherLocationDescription']!,
+                placeId: state.uri.queryParameters['placeId']!);
+          },
+        ),
       ]);
 
   @override

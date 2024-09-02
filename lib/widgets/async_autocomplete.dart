@@ -8,7 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:weather_demo/data/google_autocomplete_api.dart';
-import 'package:weather_demo/providers/weather_provider.dart';
+import 'package:weather_demo/providers/search_history_provider.dart';
 import 'package:go_router/go_router.dart';
 
 const Duration fakeAPIDuration = Duration(milliseconds: 200);
@@ -78,7 +78,6 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
 
   @override
   Widget build(BuildContext context) {
-    log("text: ${_controller.text}");
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +86,6 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
             decoration: const InputDecoration(
                 hintText: 'Enter a city', border: OutlineInputBorder()),
             onTapOutside: (event) => setState(() {
-                  log('Tapped outside');
                   FocusManager.instance.primaryFocus?.unfocus();
                 }),
             onChanged: _onSearchChanged,
@@ -97,11 +95,6 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
           builder: (BuildContext context,
               AsyncSnapshot<Iterable<Prediction>?> snapshot) {
             if (snapshot.connectionState == ConnectionState.done) {
-              if (snapshot.data != null) {
-                for (final Prediction prediction in snapshot.data!) {
-                  log('Prediction: ${prediction.description}');
-                }
-              }
               if (_controller.text.isEmpty) {
                 return const SizedBox.shrink();
               }
@@ -162,17 +155,12 @@ class _AsyncCityAutocompleteState extends State<AsyncCityAutocomplete> {
                             _controller.clear();
 
                             context
-                                .read<WeatherModel>()
-                                .setWeatherLocationDescription(
-                                    prediction.description);
-
-                            context
-                                .read<WeatherModel>()
-                                .setWeatherLocationPlaceId(prediction.placeId);
+                                .read<SearchHistoryModel>()
+                                .pushToSearchHistory(prediction.description);
 
                             context
                                 .push(Uri(
-                                    path: '/weather_search/result',
+                                    path: '/weather_result',
                                     queryParameters: {
                                       'weatherLocationDescription':
                                           prediction.description,

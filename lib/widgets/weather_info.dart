@@ -124,12 +124,19 @@ class WeatherInfoDisplay extends StatelessWidget {
               errorBuilder: (ctx, error, stackTrace) => Image.asset('01d.png')),
         ),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.pin_drop),
-            const Gap(4),
-            Text(weatherLocationDescription,
-                style: const TextStyle(
-                    fontSize: 24.0, fontWeight: FontWeight.bold)),
+            const Icon(
+              Icons.pin_drop,
+              size: 24,
+            ),
+            const Gap(8),
+            Flexible(
+              child: Text(weatherLocationDescription,
+                  softWrap: true,
+                  style: const TextStyle(
+                      fontSize: 24.0, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
         const Gap(8),
@@ -185,7 +192,6 @@ class _OpenWeatherCurrentWeatherAPI {
           WeatherResponse.fromJson(jsonDecode(response.body));
       return weatherResponse;
     } else {
-      log("Something went wrong: ${response.body}");
       final ErrorWeatherResponse errorWeatherResponse =
           ErrorWeatherResponse.fromJson(jsonDecode(response.body));
       // TODO: send error to an external service
